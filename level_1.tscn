@@ -1,0 +1,127 @@
+[gd_scene load_steps=19 format=3 uid="uid://d2ch13uom7bcx"]
+
+[ext_resource type="Texture2D" uid="uid://psweebsep57b" path="res://texture_08.png" id="1_1pa3n"]
+[ext_resource type="Script" path="res://level_1.gd" id="1_ndu61"]
+[ext_resource type="PackedScene" uid="uid://bb2x2abadx3vt" path="res://player.tscn" id="2_ed1be"]
+[ext_resource type="Shader" path="res://level_1.gdshader" id="2_mo0os"]
+[ext_resource type="PackedScene" uid="uid://douwhauypuvum" path="res://spinning_turret.tscn" id="3_bno4f"]
+[ext_resource type="Script" path="res://Door.gd" id="6_3ptc7"]
+[ext_resource type="PackedScene" uid="uid://cpi4q5blpcd6h" path="res://switch.tscn" id="7_q4qtf"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_tphwn"]
+shader = ExtResource("2_mo0os")
+
+[sub_resource type="Sky" id="Sky_h12fs"]
+sky_material = SubResource("ShaderMaterial_tphwn")
+
+[sub_resource type="Environment" id="Environment_l8m5j"]
+background_mode = 2
+background_color = Color(0.851157, 0.828308, 0.877244, 1)
+sky = SubResource("Sky_h12fs")
+ambient_light_source = 1
+
+[sub_resource type="ConvexPolygonShape3D" id="ConvexPolygonShape3D_2dkj8"]
+points = PackedVector3Array(-100, 0, -100, -100, 0, 100, 100, 0, -100, 100, 0, 100)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_j8a4x"]
+albedo_texture = ExtResource("1_1pa3n")
+uv1_scale = Vector3(50, 50, 50)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_qxjnj"]
+material = SubResource("StandardMaterial3D_j8a4x")
+size = Vector2(200, 200)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_jqe5r"]
+albedo_texture = ExtResource("1_1pa3n")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_h8yv3"]
+albedo_texture = ExtResource("1_1pa3n")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_20856"]
+albedo_texture = ExtResource("1_1pa3n")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sfdks"]
+albedo_texture = ExtResource("1_1pa3n")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_uu0uu"]
+albedo_texture = ExtResource("1_1pa3n")
+
+[node name="Level1" type="Node3D"]
+script = ExtResource("1_ndu61")
+PlayerScene = ExtResource("2_ed1be")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_l8m5j")
+
+[node name="Floor" type="StaticBody3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+shape = SubResource("ConvexPolygonShape3D_2dkj8")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
+mesh = SubResource("PlaneMesh_qxjnj")
+skeleton = NodePath("../..")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.0823021, 0.968531, -0.234894, -0.124586, 0.243843, 0.961779, 0.98879, -0.049892, 0.140734, -289.232, 19.9788, 0)
+sky_mode = 1
+
+[node name="SpinningTurret" parent="." instance=ExtResource("3_bno4f")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.450487, 0, -28.6263)
+
+[node name="PlayerSpawns" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 31.9881)
+
+[node name="0" type="Node3D" parent="PlayerSpawns" groups=["player_spawn_point"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, 0)
+
+[node name="1" type="Node3D" parent="PlayerSpawns" groups=["player_spawn_point"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, 0)
+
+[node name="2" type="Node3D" parent="PlayerSpawns" groups=["player_spawn_point"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, 10)
+
+[node name="3" type="Node3D" parent="PlayerSpawns" groups=["player_spawn_point"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, 10)
+
+[node name="Door" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.90095, -14.7938)
+script = ExtResource("6_3ptc7")
+
+[node name="CSGBox3D" type="CSGBox3D" parent="Door"]
+material_override = SubResource("StandardMaterial3D_jqe5r")
+use_collision = true
+size = Vector3(10, 10, 1)
+
+[node name="Switch" parent="Door" instance=ExtResource("7_q4qtf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.03126, -2.48914, 2.46273)
+
+[node name="Switch2" parent="Door" instance=ExtResource("7_q4qtf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.43717, 2.33167, 2.66953)
+
+[node name="Room" type="CSGCombiner3D" parent="."]
+use_collision = true
+
+[node name="CSGBox3D" type="CSGBox3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0455322, -5.32329, -23.5184)
+flip_faces = true
+size = Vector3(10.0281, 29.2883, 31.5596)
+material = SubResource("StandardMaterial3D_h8yv3")
+
+[node name="CSGBox3D4" type="CSGBox3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 39.77, -4.84954, 35.3855)
+flip_faces = true
+size = Vector3(40.0531, 30.2358, 31.5596)
+material = SubResource("StandardMaterial3D_20856")
+
+[node name="CSGBox3D2" type="CSGBox3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.937984, 4.88863, 22.6054)
+flip_faces = true
+size = Vector3(40.225, 45.649, 70.4232)
+material = SubResource("StandardMaterial3D_sfdks")
+
+[node name="CSGBox3D3" type="CSGBox3D" parent="Room"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.937984, 4.88863, -54.094)
+flip_faces = true
+size = Vector3(40.225, 45.649, 70.4232)
+material = SubResource("StandardMaterial3D_uu0uu")

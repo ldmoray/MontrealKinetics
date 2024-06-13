@@ -1,0 +1,78 @@
+[gd_scene load_steps=3 format=3 uid="uid://bpmixyhrp31b8"]
+
+[ext_resource type="Script" path="res://multiplayer_menu.gd" id="1_os45k"]
+[ext_resource type="Script" path="res://addons/Holepunch/holepunch_node.gd" id="2_gdg3u"]
+
+[node name="MultiplayerMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_os45k")
+
+[node name="HolePunch" type="Node" parent="."]
+script = ExtResource("2_gdg3u")
+rendevouz_address = "146.190.246.136"
+rendevouz_port = 8666
+
+[node name="HBoxContainer" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 13
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -177.5
+offset_right = 177.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="HBoxContainer"]
+layout_mode = 2
+alignment = 1
+
+[node name="HBoxContainer" type="HBoxContainer" parent="HBoxContainer/VBoxContainer"]
+layout_mode = 2
+alignment = 1
+
+[node name="Label" type="Label" parent="HBoxContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+text = "Name:"
+
+[node name="NameInput" type="TextEdit" parent="HBoxContainer/VBoxContainer/HBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(300, 30)
+layout_mode = 2
+
+[node name="HBoxContainer2" type="HBoxContainer" parent="HBoxContainer/VBoxContainer"]
+layout_mode = 2
+alignment = 1
+
+[node name="Label" type="Label" parent="HBoxContainer/VBoxContainer/HBoxContainer2"]
+layout_mode = 2
+text = "Code:"
+
+[node name="CodeInput" type="TextEdit" parent="HBoxContainer/VBoxContainer/HBoxContainer2"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(300, 30)
+layout_mode = 2
+
+[node name="Host" type="Button" parent="HBoxContainer/VBoxContainer"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+text = "Host"
+
+[node name="Join" type="Button" parent="HBoxContainer/VBoxContainer"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+text = "Join"
+
+[node name="Start" type="Button" parent="HBoxContainer/VBoxContainer"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+text = "Start"
+
+[connection signal="pressed" from="HBoxContainer/VBoxContainer/Host" to="." method="_on_host_pressed"]
+[connection signal="pressed" from="HBoxContainer/VBoxContainer/Join" to="." method="_on_join_pressed"]
+[connection signal="pressed" from="HBoxContainer/VBoxContainer/Start" to="." method="_on_start_pressed"]

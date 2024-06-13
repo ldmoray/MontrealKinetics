@@ -1,0 +1,59 @@
+[gd_scene load_steps=8 format=3 uid="uid://bb2x2abadx3vt"]
+
+[ext_resource type="Script" path="res://player.gd" id="1_ce6xh"]
+[ext_resource type="PackedScene" uid="uid://cqulww6lrb76g" path="res://blaster_a_2.tscn" id="2_xageb"]
+[ext_resource type="Script" path="res://player_input.gd" id="3_2gp27"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_d4445"]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_o7h7r"]
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_8axqc"]
+properties/0/path = NodePath(".:player")
+properties/0/spawn = true
+properties/0/replication_mode = 0
+properties/1/path = NodePath(".:position")
+properties/1/spawn = true
+properties/1/replication_mode = 1
+properties/2/path = NodePath(".:rotation")
+properties/2/spawn = true
+properties/2/replication_mode = 1
+properties/3/path = NodePath("Camera3D:rotation")
+properties/3/spawn = true
+properties/3/replication_mode = 1
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_qkhoe"]
+properties/0/path = NodePath("PlayerInput:direction")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+
+[node name="Player" type="CharacterBody3D" groups=["player"]]
+collision_layer = 3
+script = ExtResource("1_ce6xh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("CapsuleShape3D_d4445")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+
+[node name="GunPoint" type="Node3D" parent="Camera3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.293888, -0.692291)
+
+[node name="blasterA2" parent="Camera3D/GunPoint" instance=ExtResource("2_xageb")]
+
+[node name="Body" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+mesh = SubResource("CapsuleMesh_o7h7r")
+
+[node name="Name" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.10321, 0)
+billboard = 1
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_8axqc")
+
+[node name="PlayerInput" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_qkhoe")
+script = ExtResource("3_2gp27")

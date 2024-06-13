@@ -1,0 +1,31 @@
+[gd_scene load_steps=5 format=3 uid="uid://cpi4q5blpcd6h"]
+
+[ext_resource type="Script" path="res://Switch.gd" id="1_hhgsk"]
+[ext_resource type="Texture2D" uid="uid://qjprcnqe1wr7" path="res://target_red3_outline.png" id="2_piirg"]
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_fs533"]
+height = 0.394976
+radius = 0.716445
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_4hvkn"]
+properties/0/path = NodePath(".:hit_recently")
+properties/0/spawn = true
+properties/0/replication_mode = 2
+
+[node name="Switch" type="Area3D"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.45924, -2.48914, 0)
+collision_layer = 8
+collision_mask = 4
+script = ExtResource("1_hhgsk")
+
+[node name="Sprite3D" type="Sprite3D" parent="."]
+texture = ExtResource("2_piirg")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0)
+shape = SubResource("CylinderShape3D_fs533")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_4hvkn")
+
+[connection signal="area_entered" from="." to="." method="_on_area_entered"]
