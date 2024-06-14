@@ -94,7 +94,7 @@ use_collision = true
 size = Vector3(10, 10, 1)
 
 [node name="Switch" parent="Door" instance=ExtResource("7_q4qtf")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.03126, -2.48914, 2.46273)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.48677, -0.28299, 2.46273)
 
 [node name="Switch2" parent="Door" instance=ExtResource("7_q4qtf")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.43717, 2.33167, 2.66953)

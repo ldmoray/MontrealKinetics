@@ -73,6 +73,11 @@ custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
 text = "Start"
 
+[node name="SoloMode" type="Button" parent="HBoxContainer/VBoxContainer"]
+layout_mode = 2
+text = "Solo Mode"
+
 [connection signal="pressed" from="HBoxContainer/VBoxContainer/Host" to="." method="_on_host_pressed"]
 [connection signal="pressed" from="HBoxContainer/VBoxContainer/Join" to="." method="_on_join_pressed"]
 [connection signal="pressed" from="HBoxContainer/VBoxContainer/Start" to="." method="_on_start_pressed"]
+[connection signal="pressed" from="HBoxContainer/VBoxContainer/SoloMode" to="." method="_on_solo_mode_pressed"]

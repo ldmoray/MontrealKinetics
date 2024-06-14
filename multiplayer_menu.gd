@@ -89,3 +89,11 @@ func _on_connected_to_server():
 
 func _on_connection_failed():
 	pass
+
+
+func _on_solo_mode_pressed():
+	var peer = ENetMultiplayerPeer.new()
+	peer.create_server(666, 1)
+	multiplayer.set_multiplayer_peer(peer)
+	send_player_info(multiplayer.get_unique_id())
+	start_game()
