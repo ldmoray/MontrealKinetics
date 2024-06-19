@@ -23,11 +23,65 @@ class RpcKind(Enum):
   PeerList        = "peers"
 
   @classmethod
-  def try_from(s: str) -> Optional[RpcKind]:
+  def try_from(s: str) -> Optional["RpcKind"]:
     try:
       return RpcKind(s)
     except ValueError:
       return None
+
+
+
+class Client:
+  def __init__(self, c_name: str, c_session: str, c_ip, c_port):
+    self.name = c_name
+    self.session_id = c_session
+    self.ip = c_ip
+    self.port = c_port
+
+
+class Session:
+  def __init__(self, session_id: str, max_clients: int, server: "ServerProtocol"):
+    self.id = session_id
+    self.client_max = max_clients
+    self.server = server
+    self.registered_clients = {}
+
+  def client_checkout(self, c_name: str):
+    if c_name not in self.registered_clients:
+      return
+
+    del self.registered_clients[c_name]
+
+  def client_registered(self, client: Client):
+    if client.name in self.registered_clients:
+      return
+
+    # TODO: update the session host that there's some peers waiting?
+
+    # print("Client %c registered for Session %s" % client.name, self.id)
+    self.registered_clients[client.name] = client
+    if len(self.registered_clients) == self.client_max:
+      sleep(1) # transport.write call probably hits system call immediately.
+      print("waited for OK message to send, sending out info to peers")
+      self.exchange_peer_info()
+
+  def exchange_peer_info(self):
+    for addressed_client in self.registered_clients.values():
+      address_list = []
+      for client in self.registered_clients.values():
+        if client.name == addressed_client.name:
+          # Clients don't need to be told about themselves.
+          continue
+        address_list.append(client.name + ":" + address_to_string((client.ip, client.port)))
+      address_string = ",".join(address_list)
+      # Format: ( name ":" ip ":" port )","
+      message = bytes( "peers:" + address_string, "utf-8")
+      self.server.transport.write(message, (addressed_client.ip, addressed_client.port))
+
+    print(f"Peer info has been sent. Terminating Session: {self.id}")
+    for client in self.registered_clients:
+      self.server.client_checkout(client.name)
+    self.server.remove_session(self.id)
 
 
 class ServerProtocol(DatagramProtocol):
@@ -92,6 +146,7 @@ class ServerProtocol(DatagramProtocol):
 
     if msg_type == RpcKind.RegisterSession:
       _type, session, max_clients, *bad = data_string.split(":")
+      # TODO: Shouldn't we register the host as a client in the session???
       try:
         self.create_session(session, int(max_clients))
       except ValueError:
@@ -118,57 +173,6 @@ class ServerProtocol(DatagramProtocol):
     else:
       # Ignore bad packets.
       pass
-
-
-class Session:
-  def __init__(self, session_id: str, max_clients: int, server: ServerProtocol):
-    self.id = session_id
-    self.client_max = max_clients
-    self.server = server
-    self.registered_clients = {}
-
-  def client_checkout(self, c_name: str):
-    if c_name not in self.registered_clients:
-      return
-
-    del self.registered_clients[c_name]
-
-  def client_registered(self, client: Client):
-    if client.name in self.registered_clients:
-      return
-
-    # print("Client %c registered for Session %s" % client.name, self.id)
-    self.registered_clients[client.name] = client
-    if len(self.registered_clients) == self.client_max:
-      sleep(1) # transport.write call probably hits system call immediately.
-      print("waited for OK message to send, sending out info to peers")
-      self.exchange_peer_info()
-
-  def exchange_peer_info(self):
-    for addressed_client in self.registered_clients.values():
-      address_list = []
-      for client in self.registered_clients.values():
-        if client.name == addressed_client.name:
-          # Clients don't need to be told about themselves.
-          continue
-        address_list.append(client.name + ":" + address_to_string((client.ip, client.port)))
-      address_string = ",".join(address_list)
-      # Format: ( name ":" ip ":" port )","
-      message = bytes( "peers:" + address_string, "utf-8")
-      self.server.transport.write(message, (addressed_client.ip, addressed_client.port))
-
-    print(f"Peer info has been sent. Terminating Session: {self.id}")
-    for client in self.registered_clients:
-      self.server.client_checkout(client.name)
-    self.server.remove_session(self.id)
-
-
-class Client:
-  def __init__(self, c_name: str, c_session: str, c_ip, c_port):
-    self.name = c_name
-    self.session_id = c_session
-    self.ip = c_ip
-    self.port = c_port
 
 
 if __name__ == '__main__':
