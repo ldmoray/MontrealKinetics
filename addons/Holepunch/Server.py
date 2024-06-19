@@ -6,6 +6,7 @@ from time import sleep
 from typing import Optional
 import sys
 
+PACKET_DELIMITER = "|"
 
 class RpcKind(Enum):
 	OK = "ok" # Response OK
@@ -176,11 +177,13 @@ class ServerProtocol(DatagramProtocol):
 
 
 def _build_packet(parts) -> bytes:
-	return bytes(":".join(parts), "utf-8")
+	for p in parts:
+		assert PACKET_DELIMITER not in p
+	return bytes(PACKET_DELIMITER.join(parts), "utf-8")
 
 
 def _split_packet(packet: bytes):
-	return packet.decode("utf8").split(":")
+	return packet.decode("utf8").split(PACKET_DELIMITER)
 
 
 if __name__ == '__main__':

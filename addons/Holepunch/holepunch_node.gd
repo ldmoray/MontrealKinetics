@@ -94,6 +94,7 @@ const PEER_CONFIRM = "confirm"
 const PEER_GO = "go"
 const SERVER_OK = "ok"
 const SERVER_INFO = "peers"
+const PACKET_DELIMITER = "|"
 
 const MAX_PLAYER_COUNT: int = 2
 
@@ -290,11 +291,13 @@ func start_traversal(id, are_we_host, player_name):
 
 
 func _build_packet(parts: Array[String]) -> PackedByteArray:
-	return ":".join(parts).to_utf8_buffer()
+	for p in parts:
+		assert PACKET_DELIMITER not in p
+	return PACKET_DELIMITER.join(parts).to_utf8_buffer()
 
 func _split_packet(packet: PackedByteArray) -> PackedStringArray:
 	var s: String = packet.get_string_from_utf8()
-	return s.split(":")
+	return s.split(PACKET_DELIMITER)
 
 
 #Register a client with the server
