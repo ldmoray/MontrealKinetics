@@ -23,6 +23,7 @@ enum State {
 
   # Successfully registered session to Server, waiting for peer info.
   # emits 'session_registered' when switching into this state.
+	# The Host will emit 'session_client_registered(int)' in this state. 
   WAITING_FOR_PEERS = 2,
 
   # Server sent peer list, attempting to connect.
@@ -42,13 +43,16 @@ enum State {
 # they can host or join a game on the host port
 signal hole_punched(my_port: int, hosts_port: int, hosts_address)
 
-# Emit on the Host when a new client joins or leaves the session.
-signal session_client_registered(count: int)
-
 # This signal is emitted when the server has acknowledged
 # your client registration, but before the address and
 # port of the other client have arrived.
 signal session_registered
+
+# Emit on the Host when a new client joins or leaves the session.
+signal session_client_registered(count: int)
+
+# Emit on all players when switching into peer connection mode.
+signal peer_list_received
 
 var server_udp = PacketPeerUDP.new()
 # TODO: to support more than 1 peer, we need many peer sockets...
@@ -80,7 +84,7 @@ var peer = {}
 var host_address = ""
 var host_port: int = 0
 var client_name: String
-var p_timer
+var p_timer: Timer
 var session_id: String
 
 var ports_tried = 0
@@ -103,23 +107,6 @@ const MAX_PLAYER_COUNT: int = 2
 
 # warning-ignore:unused_argument
 func _process(delta):
-	if peer_udp.get_available_packet_count() > 0:
-		var array_bytes = peer_udp.get_packet()
-		var m: PackedStringArray = _split_packet(array_bytes)
-
-		if not recieved_peer_greet:
-			if m[0] == PEER_GREET:
-				_handle_greet_message(m[1], int(m[2]), int(m[3]))
-
-		elif not recieved_peer_confirm:
-			if m[0] == PEER_CONFIRM:
-				_handle_confirm_message(m[2], m[1], m[4], m[3])
-
-		elif not recieved_peer_go:
-			if m[0] == PEER_GO:
-				_handle_go_message(m[1])
-
-
 	if server_udp.get_available_packet_count() > 0:
 		var array_bytes = server_udp.get_packet()
 		var m: PackedStringArray = _split_packet(array_bytes)
@@ -135,13 +122,32 @@ func _process(delta):
 
 		elif not recieved_peer_info && m.size() == 2 && m[0] == SERVER_INFO:
 			recieved_peer_info = true
+			emit_signal('peer_list_received')
 			server_udp.close()
 
 			var peers = m[1].split(",")
 			for p in peers:
 				var peer_parts = p.split(":")
 				peer[peer_parts[0]] = {"port": int(peer_parts[1]), "address": peer_parts[1]}
+
 			start_peer_contact()
+
+	# Can only be handling one of session registration or peer connection at once.
+	elif peer_udp.get_available_packet_count() > 0:
+		var array_bytes = peer_udp.get_packet()
+		var m: PackedStringArray = _split_packet(array_bytes)
+
+		if not recieved_peer_greet:
+			if m[0] == PEER_GREET:
+				_handle_greet_message(m[1], int(m[2]), int(m[3]))
+
+		elif not recieved_peer_confirm:
+			if m[0] == PEER_CONFIRM:
+				_handle_confirm_message(m[2], m[1], m[4], m[3])
+
+		elif not recieved_peer_go:
+			if m[0] == PEER_GO:
+				_handle_go_message(m[1])
 
 
 
@@ -233,8 +239,8 @@ func start_peer_contact():
 
 
 # this function can be called to the server if you want to end the
-# holepunch before the server closes the session, eg: if you're done
-# waiting for new peers and just want to start the gaming session.
+# session building before it's full, eg: if you're done waiting
+# for new peers and just want to start the game.
 #
 # Can only be called by the host.
 func finalize_peers(id):
