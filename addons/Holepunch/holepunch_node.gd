@@ -258,7 +258,7 @@ func checkout():
 
 #Call this function when you want to start the holepunch process
 # TODO: rename to "start_session" or some such.
-func start_traversal(id, are_we_host, player_name):
+func start_traversal(session_code: String, are_we_host: bool, player_name: String):
 	if server_udp.is_bound():
 		server_udp.close()
 
@@ -281,7 +281,7 @@ func start_traversal(id, are_we_host, player_name):
 	ports_tried = 0
 	greets_sent = 0
 	gos_sent = 0
-	session_id = id
+	session_id = session_code
 	
 	if (is_host):
 		var buffer: PackedByteArray = _build_packet(
