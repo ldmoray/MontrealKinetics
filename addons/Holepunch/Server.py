@@ -7,11 +7,6 @@ from typing import Optional
 import sys
 
 
-def address_to_string(address):
-	ip, port = address
-	return ':'.join([ip, str(port)])
-
-
 class RpcKind(Enum):
 	OK = "ok" # Response OK
 	Err= "er" # Error.
@@ -75,8 +70,9 @@ class Session:
 				address_list.append(client.name + ":" + address_to_string((client.ip, client.port)))
 			address_string = ",".join(address_list)
 			# Format: ( name ":" ip ":" port )","
-			message = bytes( "peers:" + address_string, "utf-8")
-			self.server.transport.write(message, (addressed_client.ip, addressed_client.port))
+			self.server.transport.write(
+					_build_packet([RpcKind.PeerList.value, address_string]),
+					(addressed_client.ip, addressed_client.port))
 
 		print(f"Peer info has been sent. Terminating Session: {self.id}")
 		for client in self.registered_clients:
@@ -141,11 +137,11 @@ class ServerProtocol(DatagramProtocol):
 		"""Handle incoming datagram messages."""
 		print(datagram)
 		c_ip, c_port = address
-		data_string = datagram.decode("utf-8")
-		msg_type = RpcKind.try_from(data_string[:2])
+		packet_parts = _split_packet(datagram)
+		msg_type = RpcKind.try_from(packet_parts[0])
 
 		if msg_type == RpcKind.RegisterSession:
-			_type, session, max_clients, *bad = data_string.split(":")
+			_type, session, max_clients, *bad = packet_parts
 			# TODO: Shouldn't we register the host as a client in the session???
 			try:
 				self.create_session(session, int(max_clients))
@@ -153,26 +149,43 @@ class ServerProtocol(DatagramProtocol):
 				print("bad max client setting.")
 
 			# Say OK only after the session is actually setup.
-			self.transport.write(bytes('ok:'+str(c_port),"utf-8"), address)
+			self.transport.write(
+					_build_packet([RpcKind.OK.value, str(c_port)]),
+					address)
 
 		elif msg_type == RpcKind.RegisterClient:
-			_type, c_name, c_session, *bad = data_string.split(":")
+			_type, c_name, c_session, *bad = packet_parts
 
 			# TODO: fix this, ok should be sent after we confirm the session exists.
-			self.transport.write(bytes('ok:'+str(c_port),"utf-8"), address)
+			self.transport.write(
+					_build_packet([RpcKind.OK.value, str(c_port)]),
+					address)
 			self.register_client(c_name, c_session, c_ip, c_port)
 
 		elif msg_type == RpcKind.ExchangePeers:
-			_type, c_session, *bad = data_string.split(":")
+			_type, c_session, *bad = packet_parts
 			self.exchange_info(c_session)
 
 		elif msg_type == RpcKind.CheckoutClient:
-			_type, c_name, *bad = data_string.split(":")
+			_type, c_name, *bad = packet_parts
 			self.client_checkout(c_name)
 
 		else:
 			# Ignore bad packets.
 			pass
+
+
+def _build_packet(parts) -> bytes:
+	return bytes(":".join(parts), "utf-8")
+
+
+def _split_packet(packet: bytes):
+	return packet.decode("utf8").split(":")
+
+
+def address_to_string(address):
+	ip, port = address
+	return ':'.join([ip, str(port)])
 
 
 if __name__ == '__main__':
