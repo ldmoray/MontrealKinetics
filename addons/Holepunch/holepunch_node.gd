@@ -54,15 +54,15 @@ var peer_udp = PacketPeerUDP.new()
 
 # Set the rendevouz address to the IP address or Hostname
 # of your third party server.
-@export var rendevouz_address = "" 
+@export var rendevouz_address: String = "" 
 # Set the rendevouz port to the port of your third party server
-@export var rendevouz_port = 4000
+@export var rendevouz_port: int = 4000
 # This is the range of ports you will search if you hear no
 # response from the first port tried.
-@export var port_cascade_range = 10
+@export var port_cascade_range: int = 10
 # The amount of messages of the same type you will send before
 # cascading or giving up.
-@export var response_window = 5
+@export var response_window: int = 5
 
 
 var found_server: bool = false
@@ -132,10 +132,10 @@ func _process(delta):
 			recieved_peer_info = true
 			server_udp.close()
 
-			# TODO: this packet type embeds ":" which interferes with packet parsing...
-			if packet_string.length() > 2:
-				var m = packet_string.split(":")
-				peer[m[0]] = {"port":m[2], "address":m[1]}
+			var peers = m[1].split(",")
+			for p in peers:
+				var peer_parts = p.split(":")
+				peer[peer_parts[0]] = {"port": int(peer_parts[1]), "address": peer_parts[1]}
 				start_peer_contact()
 
 
@@ -292,7 +292,7 @@ func start_traversal(id, are_we_host, player_name):
 
 func _build_packet(parts: Array[String]) -> PackedByteArray:
 	for p in parts:
-		assert PACKET_DELIMITER not in p
+		assert(PACKET_DELIMITER not in p)
 	return PACKET_DELIMITER.join(parts).to_utf8_buffer()
 
 func _split_packet(packet: PackedByteArray) -> PackedStringArray:
