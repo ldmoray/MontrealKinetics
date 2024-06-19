@@ -61,27 +61,27 @@ class Session:
 			self.exchange_peer_info()
 
 	def exchange_peer_info(self):
-		for addressed_client in self.registered_clients.values():
-			address_list = []
-			for client in self.registered_clients.values():
-				if client.name == addressed_client.name:
-					# Clients don't need to be told about themselves.
-					continue
-				address_list.append(client.name + ":" + client.ip + ":" + str(client.port))
-			address_string = ",".join(address_list)
+		addresses = {}
+		for name, client in self.registered_clients.items():
+			addresses[name] = name + ":" + client.ip + ":" + str(client.port)
+
+		for name, client in self.registered_clients.items():
+			current = addresses.pop(name)
 			# Format: ( name ":" ip ":" port )","
+			address_string = ",".join(addresses.values())
+			addresses[name] = current
+
 			self.server.transport.write(
 					_build_packet([RpcKind.PeerList.value, address_string]),
 					(addressed_client.ip, addressed_client.port))
 
 		print(f"Peer info has been sent. Terminating Session: {self.id}")
-		for client in self.registered_clients:
-			self.server.client_checkout(client.name)
+		for c_name in self.registered_clients:
+			self.server.client_checkout(c_name)
 		self.server.remove_session(self.id)
 
 
 class ServerProtocol(DatagramProtocol):
-
 	def __init__(self):
 		# TODO: add some sort of garbage collection to clients and sessions.
 		#       Clients and Sessions shouldn't live forever.
