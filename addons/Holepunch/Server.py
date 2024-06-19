@@ -3,14 +3,13 @@ from twisted.internet import reactor
 
 from enum import Enum
 from time import sleep
-from typing import Optional
+from typing import Optional, Tuple
 import sys
 
 PACKET_DELIMITER = "|"
 
 class RpcKind(Enum):
 	OK = "ok" # Response OK
-	Err= "er" # Error.
 
 	RegisterSession = "rs"
 	RegisterClient	= "rc"
@@ -26,7 +25,6 @@ class RpcKind(Enum):
 			return None
 
 
-
 class Client:
 	def __init__(self, c_name: str, c_session: str, c_ip, c_port):
 		self.name = c_name
@@ -36,10 +34,9 @@ class Client:
 
 
 class Session:
-	def __init__(self, session_id: str, max_clients: int, server: "ServerProtocol"):
+	def __init__(self, session_id: str, max_clients: int):
 		self.id = session_id
 		self.client_max = max_clients
-		self.server = server
 		self.registered_clients = {}
 
 	def client_checkout(self, c_name: str):
@@ -48,20 +45,17 @@ class Session:
 
 		del self.registered_clients[c_name]
 
-	def client_registered(self, client: Client):
+	def client_registered(self, client: Client) -> Optional[Tuple[bool, int]]:
 		if client.name in self.registered_clients:
-			return
-
-		# TODO: update the session host that there's some peers waiting?
+			return None
 
 		# print("Client %c registered for Session %s" % client.name, self.id)
 		self.registered_clients[client.name] = client
-		if len(self.registered_clients) == self.client_max:
-			sleep(1) # transport.write call probably hits system call immediately.
-			print("waited for OK message to send, sending out info to peers")
-			self.exchange_peer_info()
 
-	def exchange_peer_info(self):
+		count = len(self.registered_clients)
+		return (count == self.client_max, count)
+
+	def exchange_peer_info(self, transport):
 		addresses = {}
 		for name, client in self.registered_clients.items():
 			addresses[name] = name + ":" + client.ip + ":" + str(client.port)
@@ -72,14 +66,11 @@ class Session:
 			address_string = ",".join(addresses.values())
 			addresses[name] = current
 
-			self.server.transport.write(
+			transport.write(
 					_build_packet([RpcKind.PeerList.value, address_string]),
 					(addressed_client.ip, addressed_client.port))
 
 		print(f"Peer info has been sent. Terminating Session: {self.id}")
-		for c_name in self.registered_clients:
-			self.server.client_checkout(c_name)
-		self.server.remove_session(self.id)
 
 
 class ServerProtocol(DatagramProtocol):
@@ -89,42 +80,58 @@ class ServerProtocol(DatagramProtocol):
 		self.active_sessions = {}
 		self.registered_clients = {}
 
-	def name_is_registered(self, name):
-		return name in self.registered_clients
-
 	def create_session(self, s_id: str, max_clients: int):
 		if s_id in self.active_sessions:
 			print("Tried to create existing session")
 			return
 
-		self.active_sessions[s_id] = Session(s_id, max_clients, self)
+		self.active_sessions[s_id] = Session(s_id, max_clients)
 
 
-	def remove_session(self, s_id):
+	def remove_session(self, session: Session):
 		try:
-			del self.active_sessions[s_id]
+			del self.active_sessions[session.id]
 		except KeyError:
 			print("Tried to terminate non-existing session")
 
+		for c in session.registered_clients:
+			self.registered_clients.pop(c)
 
 	def register_client(self, c_name: str, c_session: str, c_ip, c_port):
-		if self.name_is_registered(c_name):
+		if c_name in self.registered_clients:
 			print(f"Client {c_name} is already registered.")
 			return
 		if not c_session in self.active_sessions:
 			print(f"Client registered for non-existing session: {c_session}")
 			return
-		# TODO: this function should own sending the OK message.
+
+		self.transport.write(
+				_build_packet([RpcKind.OK.value, str(c_port)]),
+				address)
 
 		new_client = Client(c_name, c_session, c_ip, c_port)
 		self.registered_clients[c_name] = new_client
-		self.active_sessions[c_session].client_registered(new_client)
+		result = self.active_sessions[c_session].client_registered(new_client)
+
+		if result is not None:
+			done, count = result
+
+			if done:
+				sleep(1) # transport.write call probably hits system call immediately.
+				print("waited for OK message to send, sending out info to peers")
+				session.exchange_peer_info(self.transport)
+				self.remove_session(session)
+			else:
+				# TODO: update the session host that there's some peers waiting?
+				pass
 
 	def exchange_info(self, c_session):
 		"""Manually trigger exchanging peers because the host decided to start"""
 		if not c_session in self.active_sessions:
 			return
-		self.active_sessions[c_session].exchange_peer_info()
+		session = self.active_sessions[c_session]
+		session.exchange_peer_info(self.transport)
+		self.remove_session(session)
 
 	def client_checkout(self, name):
 		if name not in self.registered_clients:
@@ -156,11 +163,6 @@ class ServerProtocol(DatagramProtocol):
 
 		elif msg_type == RpcKind.RegisterClient:
 			_type, c_name, c_session, *bad = packet_parts
-
-			# TODO: fix this, ok should be sent after we confirm the session exists.
-			self.transport.write(
-					_build_packet([RpcKind.OK.value, str(c_port)]),
-					address)
 			self.register_client(c_name, c_session, c_ip, c_port)
 
 		elif msg_type == RpcKind.ExchangePeers:
