@@ -85,10 +85,10 @@ var ports_tried = 0
 var greets_sent = 0
 var gos_sent = 0
 
-const REGISTER_SESSION = "rs:"
-const REGISTER_CLIENT = "rc:"
-const EXCHANGE_PEERS = "ep:"
-const CHECKOUT_CLIENT = "cc:"
+const REGISTER_SESSION = "rs"
+const REGISTER_CLIENT = "rc"
+const EXCHANGE_PEERS = "ep"
+const CHECKOUT_CLIENT = "cc"
 const PEER_GREET = "greet"
 const PEER_CONFIRM = "confirm"
 const PEER_GO = "go"
@@ -101,27 +101,25 @@ const MAX_PLAYER_COUNT: int = 2
 func _process(delta):
 	if peer_udp.get_available_packet_count() > 0:
 		var array_bytes = peer_udp.get_packet()
-		var packet_string = array_bytes.get_string_from_ascii()
+		var m: PackedStringArray = _split_packet(array_bytes)
+
 		if not recieved_peer_greet:
-			if packet_string.begins_with(PEER_GREET):
-				var m = packet_string.split(":")
+			if m[0] == PEER_GREET:
 				_handle_greet_message(m[1], int(m[2]), int(m[3]))
 
-		if not recieved_peer_confirm:
-			if packet_string.begins_with(PEER_CONFIRM):
-				var m = packet_string.split(":")
+		elif not recieved_peer_confirm:
+			if m[0] == PEER_CONFIRM:
 				_handle_confirm_message(m[2], m[1], m[4], m[3])
 
 		elif not recieved_peer_go:
-			if packet_string.begins_with(PEER_GO):
-				var m = packet_string.split(":")
+			if m[0] == PEER_GO:
 				_handle_go_message(m[1])
 
 	if server_udp.get_available_packet_count() > 0:
 		var array_bytes = server_udp.get_packet()
-		var packet_string = array_bytes.get_string_from_ascii()
-		if packet_string.begins_with(SERVER_OK):
-			var m = packet_string.split(":")
+		var m: PackedStringArray = _split_packet(array_bytes)
+
+		if m.size() == 2 && m[0] == SERVER_OK:
 			own_port = int( m[1] )
 			emit_signal('session_registered')
 			if is_host:
@@ -129,15 +127,15 @@ func _process(delta):
 					_register_client_to_server()
 			found_server=true
 
-		if not recieved_peer_info:
-			if packet_string.begins_with(SERVER_INFO):
-				server_udp.close()
-				packet_string = packet_string.right(6)
-				if packet_string.length() > 2:
-					var m = packet_string.split(":")
-					peer[m[0]] = {"port":m[2], "address":m[1]}
-					recieved_peer_info = true
-					start_peer_contact()
+		if not recieved_peer_info && m.size() == 2 && m[0] == SERVER_INFO:
+			recieved_peer_info = true
+			server_udp.close()
+
+			# TODO: this packet type embeds ":" which interferes with packet parsing...
+			if packet_string.length() > 2:
+				var m = packet_string.split(":")
+				peer[m[0]] = {"port":m[2], "address":m[1]}
+				start_peer_contact()
 
 
 func _handle_greet_message(peer_name, peer_port, my_port):
@@ -171,9 +169,9 @@ func _handle_go_message(peer_name):
 
 func _cascade_peer(add, peer_port):
 	for i in range(peer_port - port_cascade_range, peer_port + port_cascade_range):
+		var buffer: PackedByteArray = _build_packet(
+				[PEER_GREET, client_name, str(own_port), str(i)])
 		peer_udp.set_dest_address(add, i)
-		var buffer = PackedByteArray()
-		buffer.append_array(("greet:"+client_name+":"+str(own_port)+":"+str(i)).to_utf8_buffer())
 		peer_udp.put_packet(buffer)
 		ports_tried += 1
 
@@ -182,9 +180,9 @@ func _ping_peer():
 	
 	if not recieved_peer_confirm and greets_sent < response_window:
 		for p in peer.keys():
+			var buffer: PackedByteArray = _build_packet(
+					[PEER_GREET, client_name, str(own_port), peer[p].port])
 			peer_udp.set_dest_address(peer[p].address, int(peer[p].port))
-			var buffer = PackedByteArray()
-			buffer.append_array(("greet:"+client_name+":"+str(own_port)+":"+peer[p].port).to_utf8_buffer())
 			peer_udp.put_packet(buffer)
 			greets_sent+=1
 			if greets_sent == response_window:
@@ -198,16 +196,16 @@ func _ping_peer():
 
 	if recieved_peer_greet and not recieved_peer_go:
 		for p in peer.keys():
+			var buffer: PackedByteArray = _build_packet(
+					[PEER_CONFIRM, str(own_port), client_name, str(is_host), peer[p].port])
 			peer_udp.set_dest_address(peer[p].address, int(peer[p].port))
-			var buffer = PackedByteArray()
-			buffer.append_array(("confirm:"+str(own_port)+":"+client_name+":"+str(is_host)+":"+peer[p].port).to_utf8_buffer())
 			peer_udp.put_packet(buffer)
 
 	if  recieved_peer_confirm:
 		for p in peer.keys():
+			var buffer: PackedByteArray = _build_packet(
+					[PEER_GO, client_name])
 			peer_udp.set_dest_address(peer[p].address, int(peer[p].port))
-			var buffer = PackedByteArray()
-			buffer.append_array(("go:"+client_name).to_utf8_buffer())
 			peer_udp.put_packet(buffer)
 		gos_sent += 1
 
@@ -237,8 +235,8 @@ func finalize_peers(id):
 	if !is_host:
 		return
 
-	var buffer = PackedByteArray()
-	buffer.append_array((EXCHANGE_PEERS+str(id)).to_utf8_buffer())
+	var buffer: PackedByteArray = _build_packet(
+			[EXCHANGE_PEERS, str(id)])
 	server_udp.set_dest_address(rendevouz_address, rendevouz_port)
 	server_udp.put_packet(buffer)
 
@@ -251,8 +249,8 @@ func checkout():
 	if is_host:
 		return
 
-	var buffer = PackedByteArray()
-	buffer.append_array((CHECKOUT_CLIENT+client_name).to_utf8_buffer())
+	var buffer: PackedByteArray = _build_packet(
+			[CHECKOUT_CLIENT, client_name])
 	server_udp.set_dest_address(rendevouz_address, rendevouz_port)
 	server_udp.put_packet(buffer)
 
@@ -282,8 +280,8 @@ func start_traversal(id, are_we_host, player_name):
 	session_id = id
 	
 	if (is_host):
-		var buffer = PackedByteArray()
-		buffer.append_array((REGISTER_SESSION+session_id+":"+str(MAX_PLAYER_COUNT)).to_utf8_buffer())
+		var buffer: PackedByteArray = _build_packet(
+				[REGISTER_SESSION, session_id, str(MAX_PLAYER_COUNT)])
 		server_udp.close()
 		server_udp.set_dest_address(rendevouz_address, rendevouz_port)
 		server_udp.put_packet(buffer)
@@ -291,12 +289,20 @@ func start_traversal(id, are_we_host, player_name):
 		_register_client_to_server()
 
 
+func _build_packet(parts: Array[String]) -> PackedByteArray:
+	return ":".join(parts).to_utf8_buffer()
+
+func _split_packet(packet: PackedByteArray) -> PackedStringArray:
+	var s: String = packet.get_string_from_utf8()
+	return s.split(":")
+
+
 #Register a client with the server
 func _register_client_to_server():
   # TODO: random timer, why is it needed?
 	await get_tree().create_timer(2.0).timeout
-	var buffer = PackedByteArray()
-	buffer.append_array((REGISTER_CLIENT+client_name+":"+session_id).to_utf8_buffer())
+	var buffer: PackedByteArray = _build_packet(
+			[REGISTER_CLIENT, client_name, session_id])
 	server_udp.close()
 	server_udp.set_dest_address(rendevouz_address, rendevouz_port)
 	server_udp.put_packet(buffer)
