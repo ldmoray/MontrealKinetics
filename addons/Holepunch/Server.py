@@ -83,12 +83,12 @@ class ServerProtocol(DatagramProtocol):
 		self.active_sessions = {}
 		self.registered_clients = {}
 
-	def create_session(self, s_id: str, max_clients: int):
+	def create_session(self, s_id: str, max_clients: int, host_addr):
 		if s_id in self.active_sessions:
 			print("Tried to create existing session")
 			return
 
-		session = Session(s_id, max_clients)
+		session = Session(s_id, max_clients, host_addr)
 		self.active_sessions[s_id] = session
 		return session
 
@@ -128,7 +128,7 @@ class ServerProtocol(DatagramProtocol):
 				self.remove_session(session)
 			else:
 				self.transport.write(
-						_build_packet([RpcKind.HostPeerCount, str(count)]),
+						_build_packet([RpcKind.HostPeerCount.value, str(count)]),
 						session.host_addr)
 				pass
 
@@ -156,16 +156,16 @@ class ServerProtocol(DatagramProtocol):
 		msg_type = RpcKind.try_from(packet_parts[0])
 
 		if msg_type == RpcKind.RegisterSession:
-			_type, session, max_clients, *bad = packet_parts
+			_type, session, c_name, max_clients, *bad = packet_parts
 
 			try:
 				self.create_session(session, int(max_clients), address)
-				self.register_client(c_name, c_session, c_ip, c_port)
+				self.register_client(c_name, session, c_ip, c_port)
 			except ValueError:
 				print("bad max client setting.")
 
 		elif msg_type == RpcKind.RegisterClient:
-			_type, c_name, c_session, *bad = packet_parts
+			_type, c_session, c_name, *bad = packet_parts
 			self.register_client(c_name, c_session, c_ip, c_port)
 
 		elif msg_type == RpcKind.ExchangePeers:

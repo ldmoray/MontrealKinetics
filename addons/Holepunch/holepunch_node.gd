@@ -127,7 +127,7 @@ func _process(delta):
 
 		elif m.size() == 2 && m[0] == HOST_PEER_COUNT:
 			var count = int(m[1])
-			print("currently", count, "peers in the lobby")
+			print("currently ", count, " peers in the lobby")
 
 		elif not recieved_peer_info && m.size() == 2 && m[0] == SERVER_INFO:
 			recieved_peer_info = true
@@ -286,8 +286,8 @@ func start_traversal(session_code: String, are_we_host: bool, player_name: Strin
 	
 	if (is_host):
 		var buffer: PackedByteArray = _build_packet(
-				[REGISTER_SESSION, session_id, str(MAX_PLAYER_COUNT)])
-		print("setting address:", rendevouz_address, rendevouz_port)
+				[REGISTER_SESSION, session_id, client_name, str(MAX_PLAYER_COUNT)])
+		print("setting address: ", rendevouz_address, ":", rendevouz_port)
 		server_udp.set_dest_address(rendevouz_address, rendevouz_port)
 		server_udp.put_packet(buffer)
 	else:
@@ -310,7 +310,7 @@ func _register_client_to_server():
   # TODO: random timer, why is it needed?
 	await get_tree().create_timer(2.0).timeout
 	var buffer: PackedByteArray = _build_packet(
-			[REGISTER_CLIENT, client_name, session_id])
+			[REGISTER_CLIENT, session_id, client_name])
 	server_udp.set_dest_address(rendevouz_address, rendevouz_port)
 	server_udp.put_packet(buffer)
 
