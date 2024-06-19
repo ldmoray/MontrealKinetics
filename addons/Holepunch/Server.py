@@ -41,11 +41,14 @@ class Session:
 		self.registered_clients = {}
 		self.host_addr = host_addr
 
-	def client_checkout(self, c_name: str):
+	def client_checkout(self, c_name: str) -> Optional[Tuple[bool, int]]:
 		if c_name not in self.registered_clients:
-			return
+			return None
 
 		del self.registered_clients[c_name]
+
+		count = len(self.registered_clients)
+		return (count == self.client_max, count)
 
 	def client_registered(self, client: Client) -> Optional[Tuple[bool, int]]:
 		if client.name in self.registered_clients:
@@ -146,7 +149,15 @@ class ServerProtocol(DatagramProtocol):
 			return
 
 		client = self.registered_clients.pop(name)
-		self.active_sessions[client.session_id].client_checkout(client.name)
+		session = self.active_sessions[client.session_id]
+		result = session.client_checkout(client.name)
+		if result is not None:
+			_done, count = result
+
+			# Update the host that a peer left.
+			self.transport.write(
+					_build_packet([RpcKind.HostPeerCount.value, str(count)]),
+					session.host_addr)
 
 	def datagramReceived(self, datagram, address):
 		"""Handle incoming datagram messages."""
