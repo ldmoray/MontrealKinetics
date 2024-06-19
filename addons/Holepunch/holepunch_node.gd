@@ -14,6 +14,16 @@ extends Node
 #    ( At this point the server is no longer needed. )
 #  * Host & Clients attempt to connect to one another.
 #  * Hopefully Host & Clients are connected...
+#
+#
+# Unlike STUN, the protocol implemented here doesn't continue to use the
+# server to coordinate connections, we hope we don't run into weird NATs
+# while trying to connect. We stumble around in the dark and spew some
+# packets hoping that we manage to connect to our peer.
+#
+# If the server couldn't detect IP address shenanigans between us and our
+# peer, we'll never be able to connect. If there's only port rewrites,
+# then maybe we'll be fine.
 enum State {
   # DEFAULT
   UNINIT = 0,
@@ -55,7 +65,6 @@ signal session_client_registered(count: int)
 signal peer_list_received
 
 var server_udp = PacketPeerUDP.new()
-# TODO: to support more than 1 peer, we need many peer sockets...
 var peer_udp = PacketPeerUDP.new()
 
 # Set the rendevouz address to the IP address or Hostname
@@ -128,13 +137,22 @@ func _process(delta):
 			var peers = m[1].split(",")
 			for p in peers:
 				var peer_parts = p.split(":")
-				peer[peer_parts[0]] = {"port": int(peer_parts[1]), "address": peer_parts[1]}
+				peer[peer_parts[0]] = {
+					"port": int(peer_parts[1]),
+					"address": peer_parts[1],
+					"name": peer_parts[0],
+				}
 
 			start_peer_contact()
 
 	# Can only be handling one of session registration or peer connection at once.
 	elif peer_udp.get_available_packet_count() > 0:
 		var array_bytes = peer_udp.get_packet()
+		# These are where the packet came from,
+		# not where the sender says they sent it from.
+		var peer_addr: String = peer_udp.get_packet_ip()
+		var peer_port: Int    = peer_udp.get_packet_port()
+
 		var m: PackedStringArray = _split_packet(array_bytes)
 
 		if not recieved_peer_greet:
@@ -143,7 +161,7 @@ func _process(delta):
 
 		elif not recieved_peer_confirm:
 			if m[0] == PEER_CONFIRM:
-				_handle_confirm_message(m[2], m[1], m[4], m[3])
+				_handle_confirm_message(m[1], m[2], m[4], m[3])
 
 		elif not recieved_peer_go:
 			if m[0] == PEER_GO:
@@ -151,7 +169,7 @@ func _process(delta):
 
 
 
-func _handle_greet_message(peer_name, peer_port, my_port):
+func _handle_greet_message(peer_name: String, peer_port: int, my_port: int):
 	if own_port != my_port:
 		own_port = my_port
 		peer_udp.close()
@@ -159,22 +177,22 @@ func _handle_greet_message(peer_name, peer_port, my_port):
 	recieved_peer_greet = true
 
 
-func _handle_confirm_message(peer_name, peer_port, my_port, is_host):
+func _handle_confirm_message(peer_name: String, peer_port: int, my_port: int, is_host: bool):
 	if peer[peer_name].port != peer_port:
 		peer[peer_name].port = peer_port
 
 	peer[peer_name].is_host = is_host
 	if is_host:
 		host_address = peer[peer_name].address
-		host_port = peer[peer_name].port
+		host_port = int(peer[peer_name].port)
 	peer_udp.close()
 	peer_udp.listen(own_port, "*")
 	recieved_peer_confirm = true
 
 
-func _handle_go_message(peer_name):
+func _handle_go_message(peer_name: String):
 	recieved_peer_go = true
-	emit_signal("hole_punched", int(own_port), int(host_port), host_address)
+	emit_signal("hole_punched", own_port, host_port, host_address)
 	peer_udp.close()
 	p_timer.stop()
 	set_process(false)
@@ -210,7 +228,7 @@ func _ping_peer():
 	if recieved_peer_greet and not recieved_peer_go:
 		for p in peer.keys():
 			var buffer: PackedByteArray = _build_packet(
-					[PEER_CONFIRM, str(own_port), client_name, str(is_host), peer[p].port])
+					[PEER_CONFIRM, client_name, str(own_port), str(is_host), peer[p].port])
 			peer_udp.set_dest_address(peer[p].address, int(peer[p].port))
 			peer_udp.put_packet(buffer)
 
