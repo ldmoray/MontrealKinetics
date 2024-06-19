@@ -120,13 +120,9 @@ func _process(delta):
 		var array_bytes = server_udp.get_packet()
 		var m: PackedStringArray = _split_packet(array_bytes)
 
-		if m.size() == 2 && m[0] == SERVER_OK:
-			own_port = int( m[1] )
+		if m.size() == 2 && m[0] == SERVER_OK && m[1] == session_id:
+			# Host is auto registered.
 			emit_signal('session_registered')
-			if is_host:
-				if !found_server:
-					_register_client_to_server()
-			found_server=true
 
 		if not recieved_peer_info && m.size() == 2 && m[0] == SERVER_INFO:
 			recieved_peer_info = true

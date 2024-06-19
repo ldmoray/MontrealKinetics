@@ -13,7 +13,7 @@ class RpcKind(Enum):
 
 	RegisterSession = "rs"
 	RegisterClient	= "rc"
-	ExchangePeers	 = "ep"
+	ExchangePeers	  = "ep"
 	CheckoutClient	= "cc"
 	PeerList				= "peers"
 
@@ -34,10 +34,11 @@ class Client:
 
 
 class Session:
-	def __init__(self, session_id: str, max_clients: int):
+	def __init__(self, session_id: str, max_clients: int, host_addr):
 		self.id = session_id
 		self.client_max = max_clients
 		self.registered_clients = {}
+		self.host_addr = host_addr
 
 	def client_checkout(self, c_name: str):
 		if c_name not in self.registered_clients:
@@ -86,8 +87,9 @@ class ServerProtocol(DatagramProtocol):
 			print("Tried to create existing session")
 			return
 
-		self.active_sessions[s_id] = Session(s_id, max_clients)
-
+		session = Session(s_id, max_clients)
+		self.active_sessions[s_id] = session
+		return session
 
 	def remove_session(self, session: Session):
 		try:
@@ -107,7 +109,7 @@ class ServerProtocol(DatagramProtocol):
 			return
 
 		self.transport.write(
-				_build_packet([RpcKind.OK.value, str(c_port)]),
+				_build_packet([RpcKind.OK.value, c_session]),
 				(c_ip, c_port))
 
 		new_client = Client(c_name, c_session, c_ip, c_port)
@@ -152,16 +154,12 @@ class ServerProtocol(DatagramProtocol):
 
 		if msg_type == RpcKind.RegisterSession:
 			_type, session, max_clients, *bad = packet_parts
-			# TODO: Shouldn't we register the host as a client in the session???
+
 			try:
-				self.create_session(session, int(max_clients))
+				self.create_session(session, int(max_clients), address)
+				self.register_client(c_name, c_session, c_ip, c_port)
 			except ValueError:
 				print("bad max client setting.")
-
-			# Say OK only after the session is actually setup.
-			self.transport.write(
-					_build_packet([RpcKind.OK.value, str(c_port)]),
-					address)
 
 		elif msg_type == RpcKind.RegisterClient:
 			_type, c_name, c_session, *bad = packet_parts
