@@ -1,41 +1,81 @@
 extends Node
+# Holepunch works as follows:
+#  * Session host registers with the server.
+#  * Multiple clients register with the server.
+#    TODO: support sending Host feedback of clients registering?
+#  * Either:
+#    * The Session Host decides to start (using `finalize_peers`),
+#    * Or the maximum number of clients connect.
+#  * The server sends _everyone_ (host and clients) the full peer list.
+#    ( At this point the server is no longer needed. )
+#  * Host & Clients attempt to connect to one another.
+#  * Hopefully Host & Clients are connected...
+enum State {
+  # DEFAULT
+  UNINIT = 0,
 
-#Signal is emitted when holepunch is complete. Connect this signal to your network manager
-#Once your network manager received the signal they can host or join a game on the host port
-signal hole_punched(my_port, hosts_port, hosts_address)
+  # Sending Registration to Server (client or host)
+  REGISTERING = 1,
 
-#This signal is emitted when the server has acknowledged your client registration, but before the
-#address and port of the other client have arrived.
+  # Successfully registered session to Server, waiting for peer info.
+  # emits 'session_registered' when switching into this state.
+  # TODO: emit 'session_client_registered(count)' on client registration?
+  WAITING_FOR_PEERS = 2,
+
+  # Server sent peer list, attempting to connect.
+  # TODO: emit 'peer_list_received' when switching into this state.
+  CONNECTING_PEERS = 3,
+
+  # All peers connected, process complete.
+  # emits many 'hole_punched(...)' signals before coming here.
+  # TODO: emit something when all peers are connected?
+  #
+  # There is no enum for this state, we go back to UNINIT.
+}
+
+# Signal is emitted when holepunch is complete.
+# Connect this signal to your network manager
+# Once your network manager received the signal
+# they can host or join a game on the host port
+signal hole_punched(my_port: int, hosts_port: int, hosts_address)
+
+# This signal is emitted when the server has acknowledged
+# your client registration, but before the address and
+# port of the other client have arrived.
 signal session_registered
 
 var server_udp = PacketPeerUDP.new()
+# TODO: to support more than 1 peer, we need many peer sockets...
 var peer_udp = PacketPeerUDP.new()
 
-#Set the rendevouz address to the IP address of your third party server
+# Set the rendevouz address to the IP address or Hostname
+# of your third party server.
 @export var rendevouz_address = "" 
-#Set the rendevouz port to the port of your third party server
+# Set the rendevouz port to the port of your third party server
 @export var rendevouz_port = 4000
-#This is the range of ports you will search if you hear no response from the first port tried
+# This is the range of ports you will search if you hear no
+# response from the first port tried.
 @export var port_cascade_range = 10
-#The amount of messages of the same type you will send before cascading or giving up
+# The amount of messages of the same type you will send before
+# cascading or giving up.
 @export var response_window = 5
 
 
-var found_server = false
-var recieved_peer_info = false
-var recieved_peer_greet = false
-var recieved_peer_confirm = false
-var recieved_peer_go = false
+var found_server: bool = false
+var recieved_peer_info: bool = false
+var recieved_peer_greet: bool = false
+var recieved_peer_confirm: bool = false
+var recieved_peer_go: bool = false
 
-var is_host = false
+var is_host: bool = false
 
-var own_port
+var own_port: int = 0
 var peer = {}
 var host_address = ""
-var host_port = 0
-var client_name
+var host_port: int = 0
+var client_name: String
 var p_timer
-var session_id
+var session_id: String
 
 var ports_tried = 0
 var greets_sent = 0
@@ -51,7 +91,7 @@ const PEER_GO = "go"
 const SERVER_OK = "ok"
 const SERVER_INFO = "peers"
 
-const MAX_PLAYER_COUNT = 2
+const MAX_PLAYER_COUNT: int = 2
 
 # warning-ignore:unused_argument
 func _process(delta):
@@ -82,7 +122,7 @@ func _process(delta):
 			emit_signal('session_registered')
 			if is_host:
 				if !found_server:
-					_send_client_to_server()
+					_register_client_to_server()
 			found_server=true
 
 		if not recieved_peer_info:
@@ -184,16 +224,29 @@ func start_peer_contact():
 	p_timer.start()
 
 
-#this function can be called to the server if you want to end the holepunch before the server closes the session
+# this function can be called to the server if you want to end the
+# holepunch before the server closes the session, eg: if you're done
+# waiting for new peers and just want to start the gaming session.
+#
+# Can only be called by the host.
 func finalize_peers(id):
+	if !is_host:
+		return
+
 	var buffer = PackedByteArray()
 	buffer.append_array((EXCHANGE_PEERS+str(id)).to_utf8_buffer())
 	server_udp.set_dest_address(rendevouz_address, rendevouz_port)
 	server_udp.put_packet(buffer)
 
 
-# remove a client from the server
+# Disconnect from session as a client.
+#
+# Can only be called as a client.
+# TODO: rename to "leave_session" or some such.
 func checkout():
+	if is_host:
+		return
+
 	var buffer = PackedByteArray()
 	buffer.append_array((CHECKOUT_CLIENT+client_name).to_utf8_buffer())
 	server_udp.set_dest_address(rendevouz_address, rendevouz_port)
@@ -201,15 +254,16 @@ func checkout():
 
 
 #Call this function when you want to start the holepunch process
-func start_traversal(id, is_player_host, player_name):
+# TODO: rename to "start_session" or some such.
+func start_traversal(id, are_we_host, player_name):
 	if server_udp.is_bound():
 		server_udp.close()
 
 	var err = server_udp.bind(rendevouz_port, "*")
 	if err != OK:
-		print("Error listening on port: " + str(rendevouz_port) + " to server: " + rendevouz_address)
+		print("Error listening on port: " + str(rendevouz_port))
 
-	is_host = is_player_host
+	is_host = are_we_host
 	client_name = player_name
 	found_server = false
 	recieved_peer_info = false
@@ -230,11 +284,12 @@ func start_traversal(id, is_player_host, player_name):
 		server_udp.set_dest_address(rendevouz_address, rendevouz_port)
 		server_udp.put_packet(buffer)
 	else:
-		_send_client_to_server()
+		_register_client_to_server()
 
 
 #Register a client with the server
-func _send_client_to_server():
+func _register_client_to_server():
+  # TODO: random timer, why is it needed?
 	await get_tree().create_timer(2.0).timeout
 	var buffer = PackedByteArray()
 	buffer.append_array((REGISTER_CLIENT+client_name+":"+session_id).to_utf8_buffer())
