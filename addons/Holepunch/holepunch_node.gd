@@ -23,7 +23,6 @@ enum State {
 
   # Successfully registered session to Server, waiting for peer info.
   # emits 'session_registered' when switching into this state.
-  # TODO: emit 'session_client_registered(count)' on client registration?
   WAITING_FOR_PEERS = 2,
 
   # Server sent peer list, attempting to connect.
@@ -42,6 +41,9 @@ enum State {
 # Once your network manager received the signal
 # they can host or join a game on the host port
 signal hole_punched(my_port: int, hosts_port: int, hosts_address)
+
+# Emit on the Host when a new client joins or leaves the session.
+signal session_client_registered(count: int)
 
 # This signal is emitted when the server has acknowledged
 # your client registration, but before the address and
@@ -117,6 +119,7 @@ func _process(delta):
 			if m[0] == PEER_GO:
 				_handle_go_message(m[1])
 
+
 	if server_udp.get_available_packet_count() > 0:
 		var array_bytes = server_udp.get_packet()
 		var m: PackedStringArray = _split_packet(array_bytes)
@@ -127,7 +130,8 @@ func _process(delta):
 
 		elif m.size() == 2 && m[0] == HOST_PEER_COUNT:
 			var count = int(m[1])
-			print("currently ", count, " peers in the lobby")
+			print("session_client_registered(", count, ")")
+			emit_signal('session_client_registered', count)
 
 		elif not recieved_peer_info && m.size() == 2 && m[0] == SERVER_INFO:
 			recieved_peer_info = true
@@ -137,7 +141,8 @@ func _process(delta):
 			for p in peers:
 				var peer_parts = p.split(":")
 				peer[peer_parts[0]] = {"port": int(peer_parts[1]), "address": peer_parts[1]}
-				start_peer_contact()
+			start_peer_contact()
+
 
 
 func _handle_greet_message(peer_name, peer_port, my_port):
@@ -218,10 +223,9 @@ func _ping_peer():
 
 
 func start_peer_contact():	
-	server_udp.put_packet("goodbye".to_utf8_buffer())
-	server_udp.close()
 	if peer_udp.is_bound():
 		peer_udp.close()
+
 	var err = peer_udp.listen(own_port, "*")
 	if err != OK:
 		print("Error listening on port: " + str(own_port) +" Error: " + str(err))
