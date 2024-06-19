@@ -1,4 +1,8 @@
 extends Node
+# The Holepunch addon has the goal of performing something resembling STUN
+# to get NAT traversal working for a higher level API. See Section 10 of the
+# STUN RFC: https://datatracker.ietf.org/doc/html/rfc3489#section-10
+#
 # Holepunch works as follows:
 #  * Session host registers with the server.
 #  * Multiple clients register with the server.
