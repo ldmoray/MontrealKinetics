@@ -266,7 +266,7 @@ func start_traversal(id, are_we_host, player_name):
 	own_port = randi() % 10000 + 1000
 	var err = server_udp.bind(own_port, "*")
 	if err != OK:
-		print("Error listening on port: " + str(own_port))
+		print("Error binding port:", own_port, err)
 		return
 
 	is_host = are_we_host
@@ -286,6 +286,7 @@ func start_traversal(id, are_we_host, player_name):
 	if (is_host):
 		var buffer: PackedByteArray = _build_packet(
 				[REGISTER_SESSION, session_id, str(MAX_PLAYER_COUNT)])
+		print("setting address:", rendevouz_address, rendevouz_port)
 		server_udp.set_dest_address(rendevouz_address, rendevouz_port)
 		server_udp.put_packet(buffer)
 	else:
