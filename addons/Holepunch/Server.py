@@ -67,7 +67,7 @@ class Session:
 				if client.name == addressed_client.name:
 					# Clients don't need to be told about themselves.
 					continue
-				address_list.append(client.name + ":" + address_to_string((client.ip, client.port)))
+				address_list.append(client.name + ":" + client.ip + ":" + str(client.port))
 			address_string = ",".join(address_list)
 			# Format: ( name ":" ip ":" port )","
 			self.server.transport.write(
@@ -181,11 +181,6 @@ def _build_packet(parts) -> bytes:
 
 def _split_packet(packet: bytes):
 	return packet.decode("utf8").split(":")
-
-
-def address_to_string(address):
-	ip, port = address
-	return ':'.join([ip, str(port)])
 
 
 if __name__ == '__main__':
