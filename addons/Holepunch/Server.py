@@ -13,10 +13,10 @@ class RpcKind(Enum):
 
 	HostPeerCount   = "pc"
 	RegisterSession = "rs"
-	RegisterClient	= "rc"
-	ExchangePeers	  = "ep"
-	CheckoutClient	= "cc"
-	PeerList				= "peers"
+	RegisterClient  = "rc"
+	ExchangePeers   = "ep"
+	CheckoutClient  = "cc"
+	PeerList        = "peers"
 
 	@staticmethod
 	def try_from(s: str) -> Optional["RpcKind"]:
