@@ -140,8 +140,7 @@ class Session:
     # print("Client %c registered for Session %s" % client.name, self.id)
     self.registered_clients[client.name] = client
     if len(self.registered_clients) == self.client_max:
-      # TODO: Unclear when Twisted does the io for sending the OK?
-      sleep(5)
+      sleep(1) # transport.write call probably hits system call immediately.
       print("waited for OK message to send, sending out info to peers")
       self.exchange_peer_info()
 
