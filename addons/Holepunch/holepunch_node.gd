@@ -262,9 +262,12 @@ func start_traversal(id, are_we_host, player_name):
 	if server_udp.is_bound():
 		server_udp.close()
 
-	var err = server_udp.bind(rendevouz_port, "*")
+	# Bind to a random port, it's fine.
+	own_port = randi() % 10000 + 1000
+	var err = server_udp.bind(own_port, "*")
 	if err != OK:
-		print("Error listening on port: " + str(rendevouz_port))
+		print("Error listening on port: " + str(own_port))
+		return
 
 	is_host = are_we_host
 	client_name = player_name
@@ -283,7 +286,6 @@ func start_traversal(id, are_we_host, player_name):
 	if (is_host):
 		var buffer: PackedByteArray = _build_packet(
 				[REGISTER_SESSION, session_id, str(MAX_PLAYER_COUNT)])
-		server_udp.close()
 		server_udp.set_dest_address(rendevouz_address, rendevouz_port)
 		server_udp.put_packet(buffer)
 	else:
@@ -293,6 +295,7 @@ func start_traversal(id, are_we_host, player_name):
 func _build_packet(parts: Array[String]) -> PackedByteArray:
 	for p in parts:
 		assert(PACKET_DELIMITER not in p)
+	print("Building packet: %s", parts)
 	return PACKET_DELIMITER.join(parts).to_utf8_buffer()
 
 func _split_packet(packet: PackedByteArray) -> PackedStringArray:
@@ -306,7 +309,6 @@ func _register_client_to_server():
 	await get_tree().create_timer(2.0).timeout
 	var buffer: PackedByteArray = _build_packet(
 			[REGISTER_CLIENT, client_name, session_id])
-	server_udp.close()
 	server_udp.set_dest_address(rendevouz_address, rendevouz_port)
 	server_udp.put_packet(buffer)
 

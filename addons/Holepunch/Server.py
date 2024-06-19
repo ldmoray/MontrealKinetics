@@ -17,7 +17,7 @@ class RpcKind(Enum):
 	CheckoutClient	= "cc"
 	PeerList				= "peers"
 
-	@classmethod
+	@staticmethod
 	def try_from(s: str) -> Optional["RpcKind"]:
 		try:
 			return RpcKind(s)
@@ -68,13 +68,14 @@ class Session:
 
 			transport.write(
 					_build_packet([RpcKind.PeerList.value, address_string]),
-					(addressed_client.ip, addressed_client.port))
+					(client.ip, client.port))
 
 		print(f"Peer info has been sent. Terminating Session: {self.id}")
 
 
 class ServerProtocol(DatagramProtocol):
 	def __init__(self):
+		print("created server protocol")
 		# TODO: add some sort of garbage collection to clients and sessions.
 		#       Clients and Sessions shouldn't live forever.
 		self.active_sessions = {}
@@ -107,11 +108,12 @@ class ServerProtocol(DatagramProtocol):
 
 		self.transport.write(
 				_build_packet([RpcKind.OK.value, str(c_port)]),
-				address)
+				(c_ip, c_port))
 
 		new_client = Client(c_name, c_session, c_ip, c_port)
 		self.registered_clients[c_name] = new_client
-		result = self.active_sessions[c_session].client_registered(new_client)
+		session = self.active_sessions[c_session]
+		result = session.client_registered(new_client)
 
 		if result is not None:
 			done, count = result
@@ -143,9 +145,9 @@ class ServerProtocol(DatagramProtocol):
 
 	def datagramReceived(self, datagram, address):
 		"""Handle incoming datagram messages."""
-		print(datagram)
 		c_ip, c_port = address
 		packet_parts = _split_packet(datagram)
+		print("got datagram:", packet_parts)
 		msg_type = RpcKind.try_from(packet_parts[0])
 
 		if msg_type == RpcKind.RegisterSession:
@@ -186,6 +188,12 @@ def _build_packet(parts) -> bytes:
 
 def _split_packet(packet: bytes):
 	return packet.decode("utf8").split(PACKET_DELIMITER)
+
+
+class Echo(DatagramProtocol):
+	def datagramReceived(self, datagram, address):
+		print("datagram:", datagram, "from", address)
+		self.transport.write(datagram, address)
 
 
 if __name__ == '__main__':
