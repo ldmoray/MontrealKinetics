@@ -11,6 +11,7 @@ PACKET_DELIMITER = "|"
 class RpcKind(Enum):
 	OK = "ok" # Response OK
 
+	HostPeerCount   = "pc"
 	RegisterSession = "rs"
 	RegisterClient	= "rc"
 	ExchangePeers	  = "ep"
@@ -126,7 +127,9 @@ class ServerProtocol(DatagramProtocol):
 				session.exchange_peer_info(self.transport)
 				self.remove_session(session)
 			else:
-				# TODO: update the session host that there's some peers waiting?
+				self.transport.write(
+						_build_packet([RpcKind.HostPeerCount, str(count)]),
+						session.host_addr)
 				pass
 
 	def exchange_info(self, c_session):

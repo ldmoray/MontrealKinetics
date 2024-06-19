@@ -94,6 +94,7 @@ const PEER_CONFIRM = "confirm"
 const PEER_GO = "go"
 const SERVER_OK = "ok"
 const SERVER_INFO = "peers"
+const HOST_PEER_COUNT = "pc" # number of members in the session
 const PACKET_DELIMITER = "|"
 
 const MAX_PLAYER_COUNT: int = 2
@@ -124,7 +125,11 @@ func _process(delta):
 			# Host is auto registered.
 			emit_signal('session_registered')
 
-		if not recieved_peer_info && m.size() == 2 && m[0] == SERVER_INFO:
+		elif m.size() == 2 && m[0] == HOST_PEER_COUNT:
+			var count = int(m[1])
+			print("currently", count, "peers in the lobby")
+
+		elif not recieved_peer_info && m.size() == 2 && m[0] == SERVER_INFO:
 			recieved_peer_info = true
 			server_udp.close()
 
