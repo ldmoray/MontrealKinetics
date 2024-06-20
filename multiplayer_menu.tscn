@@ -14,8 +14,6 @@ script = ExtResource("1_os45k")
 
 [node name="HolePunch" type="Node" parent="."]
 script = ExtResource("2_gdg3u")
-rendevouz_address = "146.190.246.136"
-rendevouz_port = 8666
 
 [node name="HBoxContainer" type="HBoxContainer" parent="."]
 layout_mode = 1

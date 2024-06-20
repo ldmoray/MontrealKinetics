@@ -15,6 +15,8 @@ func _ready():
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
 	multiplayer.connection_failed.connect(_on_connection_failed)
+	hole_puncher.rendevouz_address = address
+	hole_puncher.rendevouz_port    = port
 
 @rpc("any_peer", "call_local")
 func start_game():
