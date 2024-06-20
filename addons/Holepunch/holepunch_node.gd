@@ -64,8 +64,8 @@ signal session_client_registered(count: int)
 # Emit on all players when switching into peer connection mode.
 signal peer_list_received
 
-var server_udp = PacketPeerUDP.new()
-var peer_udp = PacketPeerUDP.new()
+var server_udp: PacketPeerUDP = PacketPeerUDP.new()
+var peer_udp: PacketPeerUDP = PacketPeerUDP.new()
 
 # Set the rendevouz address to the IP address or Hostname
 # of your third party server.
@@ -79,8 +79,34 @@ var peer_udp = PacketPeerUDP.new()
 # cascading or giving up.
 @export var response_window: int = 5
 
+enum PeerConnectStrategy {
+	# Initial attempt to connect to the peer. We haven't yet given up on
+	# a simple connection from using the address information provided by
+	# the Session Server.
+	ATTEMPT_GREET = 1,
 
-var found_server: bool = false
+	# Simple attempts to greet by sending packets have failed.
+	# Switch to binding many ports, and spewing many packets from each.
+	# Hope that if we do this, and our peer does as well, we might meet
+	# each other quickly.
+	ATTEMPT_BIRTHDAY_GREET = 2,
+}
+
+enum PeerConnectionState {
+	# No contact with the peer.
+	UNKNOWN = 0,
+
+	# We received a greet.
+	GREET = 1,
+
+	# we received a confirm.
+	CONFIRM = 2,
+
+	# we're sending keep alive packets back and forth while we wait
+	# for other peer connections to establish.
+	CONNECTED = 3,
+}
+
 var recieved_peer_info: bool = false
 var recieved_peer_greet: bool = false
 var recieved_peer_confirm: bool = false
@@ -141,6 +167,9 @@ func _process(delta):
 					"port": int(peer_parts[1]),
 					"address": peer_parts[1],
 					"name": peer_parts[0],
+
+					"strategy": PeerConnectStrategy.ATTEMPT_GREET,
+					"packets_sent": 0,
 				}
 
 			start_peer_contact()
@@ -151,7 +180,7 @@ func _process(delta):
 		# These are where the packet came from,
 		# not where the sender says they sent it from.
 		var peer_addr: String = peer_udp.get_packet_ip()
-		var peer_port: Int    = peer_udp.get_packet_port()
+		var peer_port: int    = peer_udp.get_packet_port()
 
 		var m: PackedStringArray = _split_packet(array_bytes)
 
@@ -161,7 +190,7 @@ func _process(delta):
 
 		elif not recieved_peer_confirm:
 			if m[0] == PEER_CONFIRM:
-				_handle_confirm_message(m[1], m[2], m[4], m[3])
+				_handle_confirm_message(m[1], int(m[2]), int(m[3]), bool(int(m[4])))
 
 		elif not recieved_peer_go:
 			if m[0] == PEER_GO:
@@ -207,6 +236,9 @@ func _cascade_peer(add, peer_port):
 		ports_tried += 1
 
 
+func _process_peer(peer):
+	pass
+
 func _ping_peer():
 	
 	if not recieved_peer_confirm and greets_sent < response_window:
@@ -228,8 +260,8 @@ func _ping_peer():
 	if recieved_peer_greet and not recieved_peer_go:
 		for p in peer.keys():
 			var buffer: PackedByteArray = _build_packet(
-					[PEER_CONFIRM, client_name, str(own_port), str(is_host), peer[p].port])
-			peer_udp.set_dest_address(peer[p].address, int(peer[p].port))
+					[PEER_CONFIRM, client_name, str(own_port), str(peer[p].port), str(int(is_host))])
+			peer_udp.set_dest_address(peer[p].address, peer[p].port)
 			peer_udp.put_packet(buffer)
 
 	if  recieved_peer_confirm:
@@ -291,16 +323,18 @@ func start_traversal(session_code: String, are_we_host: bool, player_name: Strin
 	if server_udp.is_bound():
 		server_udp.close()
 
-	# Bind to a random port, it's fine.
-	own_port = randi() % 10000 + 1000
-	var err = server_udp.bind(own_port, "*")
+	var err: Error = Error.ERR_ALREADY_IN_USE
+	while err == Error.ERR_ALREADY_IN_USE:
+		# Bind to a random port, it's fine.
+		own_port = _random_port()
+		err = server_udp.bind(own_port, "*")
+
 	if err != OK:
-		print("Error binding port:", own_port, err)
+		print("Error binding port: ", own_port, " ", error_string(err), ":", err)
 		return
 
 	is_host = are_we_host
 	client_name = player_name
-	found_server = false
 	recieved_peer_info = false
 	recieved_peer_greet = false
 	recieved_peer_confirm = false
@@ -331,6 +365,11 @@ func _build_packet(parts: Array[String]) -> PackedByteArray:
 func _split_packet(packet: PackedByteArray) -> PackedStringArray:
 	var s: String = packet.get_string_from_utf8()
 	return s.split(PACKET_DELIMITER)
+
+func _random_port() -> int:
+	const MAX_PORT = 2 ** 16 - 1
+	const RESERVED_PORTS = 1024
+	return randi() % (MAX_PORT - RESERVED_PORTS) + RESERVED_PORTS
 
 
 #Register a client with the server
